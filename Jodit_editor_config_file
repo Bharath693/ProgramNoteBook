@@ -1,0 +1,27 @@
+ const config = {
+    readonly: false,
+    height: 400,
+    disablePlugins: "powered-by-jodit, sticky",
+    askBeforePasteHTML: false,
+    askBeforePasteFromWord: false,
+    placeholder: "",
+    limitChars: 1000,
+    // enter:"br",
+    removeButtons: ['brush', 'file'],
+    cleanHTML: {
+      fillEmptyParagraph: false,
+    },
+    addNewLineOnDBLClick: false,
+    uploader: {
+      url: "http://localhost:8181/index-test.php?action=fileUpload",
+    },
+    filebrowser: {
+      ajax: {
+        url: "http://localhost:8181/index-test.php",
+      },
+    },
+    beautyHTML: true,
+    "showCharsCounter": true,
+    // "showWordsCounter": false,
+    // "showXPathInStatusbar": false
+  };
