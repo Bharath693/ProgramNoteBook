@@ -1,0 +1,17 @@
+ function _handleSubmit(details) {
+    let errors = null;
+    let serviceFormError = _validate(details);
+    if (serviceFormError) {
+      errors = { ...(errors || {}), ...serviceFormError };
+    }
+    if (errors) {
+      throw new SubmissionError({ ...errors });
+    } else {
+      let _data = {
+        username: email,
+        password: password,
+      };
+
+      updateLogin(_data);
+    }
+  }
