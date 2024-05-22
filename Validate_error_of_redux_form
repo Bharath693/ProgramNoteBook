@@ -1,0 +1,6 @@
+function _validate() {
+    const errorInstance = ErrorStore();
+    errorInstance.add("email", email, [required]);
+    errorInstance.add("password", password, [required]);
+    return errorInstance.get();
+  }
