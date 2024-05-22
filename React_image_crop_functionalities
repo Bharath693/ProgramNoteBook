@@ -1,0 +1,442 @@
+import React, { useState } from "react";
+import PropTypes from "prop-types";
+import { Form } from "react-bootstrap";
+import ReactCrop from "react-image-crop";
+import "react-image-crop/dist/ReactCrop.css";
+import { GLOBAL_IMAGES } from "../../../assets/images/global-images";
+import { DisplayCoverPicture, Btn, Dialog } from "../../../components";
+import { getCoverPictureData } from "../../../screens/banner/store/dispatchers";
+import "./index.scss";
+import { connect } from "react-redux";
+import { useEffect } from "react";
+import LoadingSpinner from "../../LoadingSpinner";
+
+const UploadCoverPicture = ({
+  selectedImage,
+  onChange,
+  onUploadCoverPhoto,
+  id,
+  containerStyle,
+  labelStyle,
+  label,
+  src,
+  fluid,
+  rounded,
+  roundedCircle,
+  thumbnail,
+  caption,
+  required,
+  type,
+  _removeImage,
+  placeholder,
+  defaultValue,
+  disabled,
+  isValid,
+  isInvalid,
+  size,
+  style,
+  plaintext,
+  accept,
+  helperText,
+  getBannerPhotoData,
+  formTitle,
+  removeImageOnClick,
+  coverPhotoDataProgress,
+  setImageValidationError,
+  itemcoverPhotoDataProgress,
+}) => {
+  const [changePhotoModal, setChangePhotoModal] = useState(false);
+  const [imageRef, setImageRef] = useState(null);
+  const [fileURL, setFileURL] = useState("");
+  const [imgSrc, setImgSrc] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [crop, setCrop] = useState({
+    unit: "%", // Can be 'px' or '%'
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+  });
+
+  const [_croppedImageUrl, seTempCroppedImageUrl] = useState(
+    selectedImage ? selectedImage : null
+  );
+
+  //we used this state to store the croppedimage(blob one)
+  const [croppedImage, setCroppedImage] = useState();
+
+  //loader state
+  const [loader, setLoader] = useState(false);
+  // image crop con
+  function handleChange(e) {
+    if (e.target.files && e.target.files.length > 0) {
+      _removeImage(false);
+      setSelectedFile(e.target.files[0]);
+      const reader = new FileReader();
+      reader.addEventListener("load", () => setImgSrc(reader.result));
+
+      setChangePhotoModal(true);
+      reader.readAsDataURL(e.target.files[0]);
+    }
+  }
+
+  // If you setState the crop in here you should return false.
+  const onImageLoaded = (image) => {
+    setImageRef(image);
+  };
+
+  const onCropComplete = async (crop) => {
+    if (crop.width < 466 || crop.height < 311) {
+      await makeClientCrop(crop);
+    } else {
+      seTempCroppedImageUrl(null);
+    }
+  };
+
+  const onCropChange = (crop, percentCrop) => {
+    // You could also use percentCrop:
+    // this.setState({ crop: percentCrop });
+    setCrop(crop);
+  };
+
+  async function makeClientCrop(crop) {
+    if (imageRef && crop.width && crop.height) {
+      const croppedImageUrl = await getCroppedImg(
+        imageRef,
+        crop,
+        selectedFile.name
+      );
+      seTempCroppedImageUrl(croppedImageUrl);
+    }
+  }
+
+  function getCroppedImg(image, crop, fileName) {
+    const canvas = document.createElement("canvas");
+    const pixelRatio = 16 / 9;
+    const scaleX = image.naturalWidth / image.width;
+    const scaleY = image.naturalHeight / image.height;
+    const ctx = canvas.getContext("2d");
+
+    canvas.width = crop.width * pixelRatio * scaleX;
+    canvas.height = crop.height * pixelRatio * scaleY;
+
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    ctx.imageSmoothingQuality = "low";
+
+    ctx.drawImage(
+      image,
+      crop.x * scaleX,
+      crop.y * scaleY,
+      crop.width * scaleX,
+      crop.height * scaleY,
+      0,
+      0,
+      crop.width * scaleX,
+      crop.height * scaleY
+    );
+    return new Promise((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) {
+            return;
+          }
+          blob.name = fileName;
+          window.URL.revokeObjectURL(fileURL);
+          setFileURL(window.URL.createObjectURL(blob));
+          resolve(window.URL.createObjectURL(blob));
+          setCroppedImage(blob);
+          _removeImage(false);
+        },
+        "image/jpeg",
+        0.1
+      );
+    });
+  }
+
+  const uploadCropImage = () => {
+    seTempCroppedImageUrl(_croppedImageUrl);
+    onChange(_croppedImageUrl);
+    setChangePhotoModal(false);
+    const data = new FormData();
+    if (!_croppedImageUrl || !croppedImage) {
+      if (selectedFile && selectedFile.size < 10534243) {
+        setLoader(true);
+        setImageValidationError("");
+        data.append("fileType", "image");
+        data.append("key", "background-images-outreachLocations");
+        data.append("file", selectedFile, selectedFile?.name, {
+          type: selectedFile?.type,
+        });
+        onUploadCoverPhoto(data);
+      } else {
+        setImageValidationError(
+          "The File size should not be greater than 10MB"
+        );
+      }
+    } else {
+      if (_croppedImageUrl !== null) {
+        setLoader(true);
+        const _croppedImg = new File([croppedImage], croppedImage?.name, {
+          type: croppedImage?.type,
+        });
+        if (_croppedImg && _croppedImg.size < 10000000) {
+          setImageValidationError("");
+          data.append("fileType", "image");
+          data.append("key", "background-images-outreachLocations");
+          data.append("file", _croppedImg, _croppedImg.name);
+          onUploadCoverPhoto(data);
+        } else {
+          setImageValidationError(
+            "The File size should not be greater than 10MB"
+          );
+        }
+      }
+    }
+    getCoverPictureData();
+  };
+
+  const removeImage = () => {
+    if (formTitle === "Add" || formTitle === "Add New Item") {
+      setImgSrc(null);
+      seTempCroppedImageUrl(null);
+      removeImageOnClick();
+      // _removeImage(true)
+      setImageValidationError("");
+    }
+    if (formTitle === "Edit" || formTitle === "Edit Items") {
+      setImgSrc(null);
+      seTempCroppedImageUrl(null);
+      _removeImage(true);
+      setImageValidationError("");
+    }
+  };
+
+  useEffect(() => {
+    if (coverPhotoDataProgress === false) {
+      setLoader(false);
+    }
+  }, [coverPhotoDataProgress]);
+
+  useEffect(() => {
+    if (itemcoverPhotoDataProgress === false) {
+      setLoader(false);
+    }
+  }, [itemcoverPhotoDataProgress]);
+
+  return (
+    <Form.Group controlId={id} className={`${containerStyle} form-group m-0`}>
+      {label && <Form.Label className={`${labelStyle}`}>{label}</Form.Label>}
+      <div>
+        <Form.Label className="mb-0">
+          {loader ? (
+            <LoadingSpinner imageStatus={true} />
+          ) : (
+            <DisplayCoverPicture
+              src={
+                imgSrc && !_croppedImageUrl
+                  ? imgSrc
+                  : _croppedImageUrl
+                  ? _croppedImageUrl
+                  : src === ""
+                  ? GLOBAL_IMAGES.DUMMY_COVER_IMAGE
+                  : src
+              }
+              fluid={fluid}
+              rounded={rounded}
+              roundedCircle={roundedCircle}
+              thumbnail={thumbnail}
+              caption={caption}
+            />
+          )}
+          <Form.Control
+            required={required}
+            type={type}
+            placeholder={placeholder}
+            defaultValue={defaultValue}
+            disabled={disabled}
+            isValid={isValid}
+            isInvalid={isInvalid}
+            size={size}
+            onChange={handleChange}
+            className={`${style} btn`}
+            plaintext={plaintext}
+            accept={accept}
+            hidden
+            onClick={(e) => setSelectedFile((e.target.value = null))}
+          />
+          <Btn
+            variant="outline-primary"
+            size="lg"
+            label={_croppedImageUrl || imgSrc ? "Change Photo" : "Attach Photo"}
+            for={id}
+            as="label"
+            disabled={coverPhotoDataProgress}
+          />
+        </Form.Label>
+        {(_croppedImageUrl || imgSrc) && (
+          <input
+            type="button"
+            className="btn-remove"
+            value="Remove"
+            onClick={(_) => removeImage()}
+          />
+        )}
+      </div>
+
+      <Dialog
+        title={"Crop Image"}
+        description={
+          imgSrc && (
+            <ReactCrop
+              src={imgSrc}
+              crop={crop}
+              ruleOfThirds
+              onImageLoaded={onImageLoaded}
+              onComplete={onCropComplete}
+              onChange={onCropChange}
+            />
+          )
+        }
+        centered={true}
+        show={changePhotoModal}
+        close={(val) => {
+          setChangePhotoModal(val);
+        }}
+        actions={
+          <div className="btn-wrap d-flex justify-content-end">
+            <Btn
+              variant="secondary"
+              label="Cancel"
+              onClick={() => {
+                setChangePhotoModal(false);
+                setImgSrc(null);
+                seTempCroppedImageUrl(null);
+              }}
+            />
+            <Btn
+              variant="primary"
+              label="Save"
+              onClick={() => {
+                uploadCropImage();
+              }}
+            />
+          </div>
+        }
+      />
+      <Form.Control.Feedback
+        type={`${isValid && "valid"} ${isInvalid && "invalid"}`}
+      >
+        {helperText}
+      </Form.Control.Feedback>
+    </Form.Group>
+  );
+};
+
+/**
+ * src: source of an image
+ * cpation: set caption
+ * style: Manually style the image
+ * containerStyle: Manually style the wrapper
+ * fluid: Sets image as fluid image.
+ * rounded: Sets image shape as rounded.
+ * roundedCircle: Sets image shape as circle.
+ * thumbnail: Sets image shape as thumbnail.
+ * as: The underlying HTML element to use when rendering the FormControl. 'input' | 'textarea'
+ * label: set label text
+ * id: set element id
+ * type: set the type of input
+ * placeholder: placeholder of input
+ * defaultValue: set defaultValue
+ * size: Input size variants 'sm' | 'lg'
+ * style: Manually style the control
+ * labelStyle: Manually style the label
+ * containerStyle: Manually style the wrapper
+ * helperText:  providing helper text
+ * rows: set rows size for textarea
+ * maxLength: set maxLength of input
+ * disabled: Make the control disabled
+ * isValid : Manually style the input as valid
+ * isInvalid : Manually style the input as invalid
+ * readOnly : Readlonly element
+ * required : set is required or not
+ * plaintext: Render the input as plain text. Generally used along side readOnly.
+ * onChange: handlers from firing regardless of the rendered element.
+ * cropConfig: set the crop config
+ * isCropLocked: set the crop resize as locked
+ */
+
+UploadCoverPicture.propTypes = {
+  as: PropTypes.string,
+  label: PropTypes.string,
+  id: PropTypes.string,
+  type: PropTypes.string,
+  src: PropTypes.string,
+  placeholder: PropTypes.string,
+  defaultValue: PropTypes.string,
+  size: PropTypes.string,
+  style: PropTypes.string,
+  labelStyle: PropTypes.string,
+  containerStyle: PropTypes.string,
+  helperText: PropTypes.string,
+  accept: PropTypes.string,
+  rows: PropTypes.number,
+  maxLength: PropTypes.number,
+  disabled: PropTypes.bool,
+  isValid: PropTypes.bool,
+  isInvalid: PropTypes.bool,
+  readOnly: PropTypes.bool,
+  required: PropTypes.bool,
+  plaintext: PropTypes.bool,
+  onChange: PropTypes.func,
+  onUploadCoverPhoto: PropTypes.func,
+  cropConfig: PropTypes.object,
+  isCropLocked: PropTypes.bool,
+};
+
+UploadCoverPicture.defaultProps = {
+  as: "input",
+  label: "",
+  id: "",
+  type: "file",
+  placeholder: "",
+  src: "",
+  defaultValue: "",
+  size: "",
+  style: "",
+  labelStyle: "",
+  containerStyle: "",
+  helperText: "",
+  accept: "image/gif, image/jpeg, image/png",
+  rows: null,
+  maxLength: null,
+  disabled: false,
+  isValid: false,
+  isInvalid: false,
+  readOnly: false,
+  required: false,
+  plaintext: false,
+  onChange: () => {},
+  onUploadCoverPhoto: () => {},
+  cropConfig: {
+    x: 25,
+    y: 25,
+    unit: "%",
+    width: 50,
+    aspect: 1 / 1,
+  },
+  isCropLocked: true,
+};
+const mapDispatchToProps = (dispatch) => {
+  return {
+    getCoverPictureData: () => dispatch(getCoverPictureData()),
+  };
+};
+
+const mapStateToProps = ({ banner, program }) => {
+  return {
+    getBannerPhotoData: banner.getPhotoData,
+    coverPhotoDataProgress: banner.coverPhotoDataProgress,
+    itemcoverPhotoDataProgress: program.uploadCoverPhotoInProgress,
+  };
+};
+export default connect(mapStateToProps, mapDispatchToProps)(UploadCoverPicture);
