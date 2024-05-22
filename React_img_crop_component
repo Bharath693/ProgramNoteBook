@@ -1,0 +1,8 @@
+<ReactCrop
+              src={imgSrc}
+              crop={crop}
+              ruleOfThirds
+              onImageLoaded={onImageLoaded}
+              onComplete={onCropComplete}
+              onChange={onCropChange}
+            />
