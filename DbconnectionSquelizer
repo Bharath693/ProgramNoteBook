@@ -1,0 +1,41 @@
+connectDatabase({ database, port: dbPort, host, user, password })
+  .then((_) => loadModels())
+  .then((_) => syncTables())
+  // .then (_ => addMasterRecords())
+  .then((_) =>
+    AWSService.init({ bucket, accessKeyId, secretAccessKey, region })
+  )
+  .then(() =>
+    AWSService.setDefaultSMSPayload({
+      originationNumber: Constants.SMS.ORIGINATION_NUMBER,
+      senderId: Constants.SMS.SENDER_ID,
+    })
+  )
+  .then((_) =>
+    BitlyService.init({ bitlyClientId, bitlyClientSecret, bitlyAccessToken })
+  )
+  .then((_) => configureRoutes(app))
+  .then(runCron)
+  .then(() => connectToQueue(process.env.RABBIT_MQ_ARN))
+  .then(consumeBulkEmailProcessQueue)
+  .then(consumeSendEmailQueue)
+  .then(consumeCMVRCenterMemberAssignQueue)
+  .then(consumeCMVRCenterMemberUnAssignQueue)
+  .then(runSQLUpdates)
+  .then(runMigration)
+  .then((_) => {
+    return app.listen(port, () => {
+      console.log(`listening on *: ${port}`);
+    });
+  })
+  .then(()=>{
+    // encryptAccountData()
+    // encryptVeteranData()
+    // encryptCCPData()
+  })
+  .catch((err) => {
+    console.log(err);
+    console.log(
+      "Failed connecting to database, please check if the credentials are correct"
+    );
+  });
