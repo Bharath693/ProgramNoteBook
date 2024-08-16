@@ -1,0 +1,63 @@
+const fs = require("fs");
+const path = require("path");
+const Sequelize = require("sequelize");
+let sequelize = null;
+let modelStore = {};
+
+function connectDatabase(databaseConfig) {
+  // Database settings for the current environment
+  const { database, host, port, user, password } = databaseConfig;
+  sequelize = new Sequelize(database, user, password, {
+    host,
+    port,
+    dialect: "postgres",
+    operatorsAliases: 0,
+    pool: {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000,
+    },
+    logging: false,
+    query: {
+      raw: true,
+    },
+  });
+  return sequelize.authenticate();
+}
+
+function sync() {
+  if (sequelize) {
+    return sequelize.sync();
+  }
+  return null;
+}
+
+function loadModels(baseFolderPath = `${__dirname}/../models/`) {
+  function _getAllModels(folderName) {
+    fs.readdirSync(folderName).map((file) => {
+      const fullName = path.join(folderName, file);
+      const stat = fs.lstatSync(fullName);
+      if (stat.isDirectory()) {
+        _getAllModels(fullName);
+      } else if (file.indexOf(".") !== 0 && file !== "index.js") {
+        const model = sequelize.import(fullName);
+        modelStore[model.name] = model;
+      }
+    });
+  }
+  const models = _getAllModels(baseFolderPath);
+  Object.keys(modelStore).forEach((modelName) => {
+    if (modelStore[modelName].associate) {
+      modelStore[modelName].associate(modelStore);
+    }
+  });
+  return models;
+}
+
+function getModel(modelName) {
+  if (modelStore.hasOwnProperty(modelName)) {
+    return modelStore[modelName];
+  }
+  return null;
+}
