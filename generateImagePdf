@@ -1,0 +1,107 @@
+ const handleExport = () => {
+    const { firstDay, lastDay } = getStartAndEndDate();
+    const input = document.getElementById("pdf-content");
+
+    setLoading(true);
+
+    const logoWidth = 30;
+    const logoHeight = 15;
+
+    const loadLogoImage = (url) =>
+      new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => resolve(img);
+        img.src = url;
+      });
+
+    loadLogoImage(logoUrl).then((logoImg) => {
+      html2canvas(input, { scale: 2 }).then((canvas) => {
+        const imgData = canvas.toDataURL("image/png");
+        const imgProps = {
+          width: canvas.width,
+          height: canvas.height,
+        };
+
+        const pdf = new jsPDF("p", "mm", "a4");
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const padding = 10;
+
+        const contentWidth = pageWidth - padding * 2;
+        const contentHeight = (imgProps.height * contentWidth) / imgProps.width;
+
+        const imgHeightPx = (canvas.height * contentWidth) / canvas.width;
+        const pageHeightPx = pageHeight - padding * 2 - logoHeight - 5;
+
+        let position = 0;
+        let pageCount = 0;
+
+        const canvasImage = new Image();
+        canvasImage.src = imgData;
+
+        canvasImage.onload = () => {
+          while (position < imgHeightPx) {
+            if (pageCount > 0) pdf.addPage();
+
+            pdf.addImage(
+              logoImg,
+              "PNG",
+              padding,
+              padding,
+              logoWidth,
+              logoHeight
+            );
+
+            const yOffset = (position * canvas.height) / imgHeightPx;
+            const pageCanvas = document.createElement("canvas");
+            const pageCtx = pageCanvas.getContext("2d");
+
+            pageCanvas.width = canvas.width;
+            pageCanvas.height = (pageHeightPx * canvas.height) / imgHeightPx;
+
+            pageCtx.drawImage(
+              canvas,
+              0,
+              yOffset,
+              canvas.width,
+              pageCanvas.height,
+              0,
+              0,
+              canvas.width,
+              pageCanvas.height
+            );
+
+            const pageData = pageCanvas.toDataURL("image/png");
+            const contentY = padding + logoHeight + 5;
+
+            pdf.addImage(
+              pageData,
+              "PNG",
+              padding,
+              contentY,
+              contentWidth,
+              pageHeight - contentY - 10
+            );
+
+            const footerText = "Infojini Consulting Private Limited";
+            pdf.setFontSize(10);
+            const textWidth = pdf.getTextWidth(footerText);
+            const footerX = (pageWidth - textWidth) / 2;
+            const footerY = pageHeight - 10;
+            pdf.text(footerText, footerX, footerY);
+
+            position += pageHeightPx;
+            pageCount++;
+          }
+
+          pdf.save(
+            `${getMealName(mealType)}-${getLocationName(location)}-${moment(
+              firstDay
+            ).format("MMM,YY")}.pdf`
+          );
+          setLoading(false);
+        };
+      });
+    });
+  };
